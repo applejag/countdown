@@ -28,8 +28,11 @@ countdown: Remaining: 57s
 Requires Go 1.18 (or later)
 
 ```sh
-go install github.com/jilleJr/countdown@latest
+go install -ldflags='-s -w' github.com/jilleJr/countdown@latest
 ```
+
+> The `-ldflag='-s -w'` removes debug symbols,
+> reducing the binary size from about 2.5M down to 1.6M.
 
 ## Usage
 
