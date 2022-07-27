@@ -39,6 +39,14 @@ func init() {
 	pflag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage: countdown <duration>
 
+The <duration> argument is a Go time.Duration formatted string.
+Examples:
+
+  countdown 10s        // 10 seconds
+  countdown 10m        // 10 minutes
+  countdown 1m30s      // 1 minute and 30 seconds
+  countdown 1h20m30s   // 1 hour, 20 minutes, and 30 seconds
+
 Flags:
 `)
 		pflag.PrintDefaults()
