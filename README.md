@@ -1,4 +1,12 @@
+<!--
+SPDX-FileCopyrightText: 2021 Kalle Fagerberg
+
+SPDX-License-Identifier: CC0-1.0
+-->
+
 # countdown
+
+[![REUSE status](https://api.reuse.software/badge/github.com/jilleJr/countdown)](https://api.reuse.software/info/github.com/jilleJr/countdown)
 
 I needed a small countdown util. So I made one
 
@@ -31,3 +39,11 @@ Flags:
   -h, --help           Show this help text
       --no-notify      Disables notification via notify-send
 ```
+
+## License
+
+Written and maintained by [@jilleJr](https://github.com/jilleJr).
+Code is licensed under the GNU GPL 3.0 or later,
+with misc. documents licensed under CC0 1.0.
+
+This repository is [REUSE](https://reuse.software/) compliant.
