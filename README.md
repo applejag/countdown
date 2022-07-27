@@ -19,7 +19,7 @@ logging.
 $ countdown 10s
 countdown: Done waiting for: 10
 
-$ countdown 10s
+$ countdown 1m
 countdown: Remaining: 57s
 ```
 
