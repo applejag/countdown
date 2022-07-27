@@ -17,7 +17,7 @@ logging.
 
 ```console
 $ countdown 10s
-countdown: Done waiting for: 10
+countdown: Done waiting for: 10s
 
 $ countdown 1m
 countdown: Remaining: 57s
