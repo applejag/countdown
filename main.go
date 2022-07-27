@@ -8,15 +8,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/mattn/go-colorable"
 	"github.com/spf13/pflag"
 )
 
 var flags = struct {
 	noNotify bool
+	color    string
 	showHelp bool
-}{}
+}{
+	color: "auto",
+}
+
+var (
+	stdout = colorable.NewColorableStdout()
+	stderr = colorable.NewColorableStderr()
+
+	colorCmdName   = color.New(color.FgHiBlack)
+	colorErrPrefix = color.New(color.FgHiRed, color.Bold)
+	colorErr       = color.New(color.FgRed)
+	colorDuration  = color.New(color.FgHiMagenta, color.Bold)
+	colorDone      = color.New(color.FgGreen)
+)
 
 func init() {
+	pflag.StringVar(&flags.color, "color", flags.color, `Colored output, either "always", "never", or "auto"`)
 	pflag.BoolVar(&flags.noNotify, "no-notify", false, "Disables notification via notify-send")
 	pflag.BoolVarP(&flags.showHelp, "help", "h", false, "Show this help text")
 	pflag.Usage = func() {
@@ -34,6 +51,19 @@ func main() {
 	if flags.showHelp {
 		pflag.Usage()
 		os.Exit(0)
+	}
+
+	flags.color = strings.ToLower(flags.color)
+	switch flags.color {
+	case "auto":
+	// Do nothing
+	case "never":
+		color.NoColor = true
+	case "always":
+		color.NoColor = false
+	default:
+		printErr(errors.New(`invalid --color value, must be one of "always", "never", or "auto"`))
+		os.Exit(1)
 	}
 
 	args := pflag.Args()
@@ -56,33 +86,60 @@ func main() {
 		os.Exit(1)
 	}
 
-	ticker := time.NewTicker(time.Second)
 	timer := time.NewTimer(dur)
+	ticker := time.NewTicker(time.Second)
 	start := time.Now()
 
 	printRemaining(dur, start)
 	for {
 		select {
-		case <-ticker.C:
-			printRemaining(dur, start)
 		case <-timer.C:
 			ticker.Stop()
-			fmt.Printf("\rDone waiting for %s\n", dur)
+			printDone(dur)
 			if !flags.noNotify {
 				sendNotification(dur)
 			}
 			return
+		case <-ticker.C:
+			printRemaining(dur, start)
 		}
 	}
 }
 
 func printRemaining(dur time.Duration, start time.Time) {
 	passed := time.Since(start)
-	fmt.Printf("\r\x1B[0KRemaining: %s", (dur - passed).Round(time.Second))
+	if color.NoColor {
+		fmt.Printf("Remaining: %s\n", (dur - passed).Round(time.Second))
+	} else {
+		fmt.Printf("\r\x1B[0K%s Remaining: %s",
+			colorCmdName.Sprint("countdown:"),
+			colorDuration.Sprint((dur - passed).Round(time.Second)),
+		)
+	}
+}
+
+func printDone(dur time.Duration) {
+	if color.NoColor {
+		fmt.Printf("Done waiting for %s\n", dur)
+	} else {
+		fmt.Printf("\r\x1B[0K%s %s %s\n",
+			colorCmdName.Sprint("countdown:"),
+			colorDone.Sprint("Done waiting for:"),
+			colorDuration.Sprint(dur.Round(time.Second)),
+		)
+	}
 }
 
 func printErr(err error) {
-	fmt.Printf("countdown: err: %s\n", err)
+	if color.NoColor {
+		fmt.Fprintf(os.Stderr, "countdown: err: %s\n", err)
+	} else {
+		fmt.Fprintf(stderr, "%s %s %s\n",
+			colorCmdName.Sprint("countdown:"),
+			colorErrPrefix.Sprint("err:"),
+			colorErr.Sprint(err),
+		)
+	}
 }
 
 func sendNotification(dur time.Duration) {
