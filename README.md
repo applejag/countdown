@@ -12,6 +12,17 @@ I needed a small countdown util. So I made one
 
 Sends a notification when the time has expired.
 
+This is basically the same as `sleep 1s && notify-send`, but with progress
+logging.
+
+```console
+$ countdown 10s
+countdown: Done waiting for: 10
+
+$ countdown 10s
+countdown: Remaining: 57s
+```
+
 ## Install
 
 Requires Go 1.18 (or later)
