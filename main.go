@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/jilleJr/countdown/internal/fuzzytime"
 	"github.com/mattn/go-colorable"
 	"github.com/spf13/pflag"
 )
@@ -64,6 +65,8 @@ Examples:
   countdown 1m30s      // 1 minute and 30 seconds
   countdown 1h20m30s   // 1 hour, 20 minutes, and 30 seconds
 
+  countdown 12:00      // countdown to the next 12 o'clock
+
 Flags:
 `)
 		pflag.PrintDefaults()
@@ -93,9 +96,8 @@ func main() {
 
 	args := pflag.Args()
 	if len(args) == 0 {
-		printErr(errors.New("missing argument"))
 		pflag.Usage()
-		os.Exit(1)
+		os.Exit(0)
 	}
 	if len(args) > 1 {
 		printErr(errors.New("too many arguments"))
@@ -103,18 +105,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	arg := strings.TrimSpace(args[0])
-	dur, err := time.ParseDuration(arg)
+	end, err := fuzzytime.ParseFuture(strings.TrimSpace(args[0]), time.Now())
 	if err != nil {
-		printErr(fmt.Errorf("parse argument: %w", err))
-		pflag.Usage()
+		printErr(fmt.Errorf("parse time or duration: %w", err))
 		os.Exit(1)
 	}
 
+	start := time.Now()
+	dur := end.Sub(start).Round(time.Millisecond)
 	timer := time.NewTimer(dur)
 	ticker := time.NewTicker(time.Second)
-	start := time.Now()
 
+	printEnd(end)
 	printRemaining(dur, start)
 	for {
 		select {
@@ -131,12 +133,23 @@ func main() {
 	}
 }
 
+func printEnd(end time.Time) {
+	if color.NoColor {
+		fmt.Printf("countdown: Waiting for: %s\n", end.Format(time.Stamp))
+	} else {
+		fmt.Printf("%s Waiting for: %s\n",
+			colorCmdName.Sprint("countdown:"),
+			colorDuration.Sprint(end.Format(time.Stamp)),
+		)
+	}
+}
+
 func printRemaining(dur time.Duration, start time.Time) {
 	passed := time.Since(start)
 	if color.NoColor {
-		fmt.Printf("Remaining: %s\n", (dur - passed).Round(time.Second))
+		fmt.Printf("countdown: Remaining:   %s\n", (dur - passed).Round(time.Second))
 	} else {
-		fmt.Printf("\r\x1B[0K%s Remaining: %s",
+		fmt.Printf("\r\x1B[0K%s Remaining:   %s",
 			colorCmdName.Sprint("countdown:"),
 			colorDuration.Sprint((dur - passed).Round(time.Second)),
 		)
@@ -145,7 +158,7 @@ func printRemaining(dur time.Duration, start time.Time) {
 
 func printDone(dur time.Duration) {
 	if color.NoColor {
-		fmt.Printf("Done waiting for %s\n", dur)
+		fmt.Printf("countdown: Done waiting for %s\n", dur)
 	} else {
 		fmt.Printf("\r\x1B[0K%s %s %s\n",
 			colorCmdName.Sprint("countdown:"),

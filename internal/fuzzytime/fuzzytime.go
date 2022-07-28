@@ -22,6 +22,7 @@ package fuzzytime
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -33,6 +34,10 @@ import (
 var (
 	// ErrUnknownFormat is returned when no time layout format was matched.
 	ErrUnknownFormat = errors.New("unknown time format")
+	// ErrTimeAlreadyPassed is returned when the resulting time is in the past.
+	ErrTimeAlreadyPassed = errors.New("time already passed")
+	// ErrDurationNegative is returned by Parse when duration was negative.
+	ErrDurationNegative = fmt.Errorf("%w: duration cannot be negative", ErrTimeAlreadyPassed)
 )
 
 var w *when.Parser
@@ -41,22 +46,89 @@ func init() {
 	w = when.New(nil)
 	w.Add(en.All...)
 	w.Add(common.All...)
+	w.Add(onlyHourRule{})
 }
 
-// Parse attempts to parse the string literal "now", a delta time, a list of
-// known formats, and lastly via the `when` fuzzy parsing package, and returns
-// the time on the first match it finds.
-func Parse(s string, base time.Time) (time.Time, error) {
+// ParseFuture a duration, a list of known formats, and lastly via the `when`
+// fuzzy parsing package, and returns the time on the first match it finds.
+//
+// The result will be adjusted to try fit into the future, otherwise an error
+// is returned.
+func ParseFuture(s string, base time.Time) (time.Time, error) {
 	if strings.EqualFold(s, "now") {
 		return time.Now(), nil
 	}
 	if t, ok := ParseDelta(s, base); ok {
+		if t.Before(base) {
+			return time.Time{}, ErrDurationNegative
+		}
 		return t, nil
 	}
 	if t, err := ParseKnownLayouts(s); err == nil {
+		if t.Before(base) {
+			return time.Time{}, fmt.Errorf("%w: %s", ErrTimeAlreadyPassed, t.Format(time.Stamp))
+		}
 		return t, nil
 	}
-	return ParseWhen(s, base)
+	return parseWhenFuture(s, base)
+}
+
+func parseWhenFuture(s string, base time.Time) (time.Time, error) {
+	d, err := parseWhenDiff(s, base)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if d.t.After(base) {
+		return d.t, nil
+	}
+	// At this point, the parsed time is thought to be in the past.
+	// Can we assume the future?
+	switch {
+	case d.hasY && d.hasM && d.hasD:
+		return time.Time{}, fmt.Errorf("%w: must be today or future day: %d-%d-%d", ErrTimeAlreadyPassed, d.y, d.m, d.d)
+	case !d.hasM && !d.hasD && d.hasH:
+		fmt.Println("Woa", d.t, "     ", d.t.Add(24*time.Hour))
+		return d.t.Add(24 * time.Hour), nil
+	default:
+		return time.Time{}, fmt.Errorf("%w: %s", ErrTimeAlreadyPassed, d.t.Format(time.Stamp))
+	}
+}
+
+type whenDiff struct {
+	t                                           time.Time
+	y, d, h, min, s, ns                         int
+	m                                           time.Month
+	hasY, hasM, hasD, hasH, hasMin, hasS, hasNs bool
+}
+
+func parseWhenDiff(s string, base time.Time) (whenDiff, error) {
+	t1, err := ParseWhen(s, base)
+	if err != nil {
+		return whenDiff{}, err
+	}
+	t1y, t1m, t1d := t1.Date()
+	t1h, t1min, t1s := t1.Clock()
+	t1ns := t1.Nanosecond()
+	t2, err := ParseWhen(s, time.Date(
+		t1y^1, t1m^1, t1d^1,
+		t1h^1, t1min^1, t1s^1, t1ns^1,
+		t1.Location()))
+	if err != nil {
+		return whenDiff{}, err
+	}
+	t2y, t2m, t2d := t2.Date()
+	t2h, t2min, t2s := t2.Clock()
+	t2ns := t2.Nanosecond()
+	return whenDiff{
+		t: t1,
+		y: t1y, hasY: t1y == t2y,
+		m: t1m, hasM: t1m == t2m,
+		d: t1d, hasD: t1d == t2d,
+		h: t1h, hasH: t1h == t2h,
+		min: t1min, hasMin: t1min == t2min,
+		s: t1s, hasS: t1s == t2s,
+		ns: t1ns, hasNs: t1ns == t2ns,
+	}, nil
 }
 
 var knownLayouts = []string{
@@ -67,6 +139,7 @@ var knownLayouts = []string{
 	time.RFC850,
 	time.RFC1123,
 	time.RFC1123Z,
+	time.Stamp,
 }
 
 // ParseKnownLayouts attempts to parse the string according to the date formats
@@ -92,13 +165,10 @@ func ParseWhen(s string, base time.Time) (time.Time, error) {
 	return r.Time, nil
 }
 
-// ParseDelta attempts to parse the string as a time.Duration if it is prefixed
-// with a sign ("+" or "-"), and adds that to the current time.
+// ParseDelta attempts to parse the string as a time.Duration and adds that to
+// the current time.
 func ParseDelta(s string, base time.Time) (time.Time, bool) {
-	if len(s) < 3 {
-		return time.Time{}, false
-	}
-	if s[0] != '+' && s[0] != '-' {
+	if len(s) < 2 {
 		return time.Time{}, false
 	}
 	d, err := time.ParseDuration(s)
