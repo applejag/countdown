@@ -46,6 +46,7 @@ func init() {
 	w = when.New(nil)
 	w.Add(en.All...)
 	w.Add(common.All...)
+	w.Add(optionalHourRule{})
 	w.Add(onlyHourRule{})
 }
 
