@@ -49,9 +49,10 @@ Examples:
   countdown 1h20m30s   // 1 hour, 20 minutes, and 30 seconds
 
 Flags:
-      --color string   Colored output, either "always", "never", or "auto" (default "auto")
-  -h, --help           Show this help text
-      --no-notify      Disables notification via notify-send
+      --color string     Colored output, either "always", "never", or "auto" (default "auto")
+  -h, --help             Show this help text
+  -m, --message string   Show a custom message when the time runs out
+      --no-notify        Disables notification via notify-send
 ```
 
 ## License
