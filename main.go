@@ -35,6 +35,7 @@ var flags = struct {
 	noNotify bool
 	color    string
 	showHelp bool
+	message  string
 }{
 	color: "auto",
 }
@@ -43,17 +44,20 @@ var (
 	stdout = colorable.NewColorableStdout()
 	stderr = colorable.NewColorableStderr()
 
-	colorCmdName   = color.New(color.FgHiBlack)
-	colorErrPrefix = color.New(color.FgHiRed, color.Bold)
-	colorErr       = color.New(color.FgRed)
-	colorDuration  = color.New(color.FgHiMagenta, color.Bold)
-	colorDone      = color.New(color.FgGreen)
+	colorCmdName       = color.New(color.FgHiBlack)
+	colorErrPrefix     = color.New(color.FgHiRed, color.Bold)
+	colorErr           = color.New(color.FgRed)
+	colorDuration      = color.New(color.FgHiMagenta, color.Bold)
+	colorDone          = color.New(color.FgGreen)
+	colorMessagePrefix = color.New(color.FgWhite)
+	colorMessage       = color.New(color.FgHiWhite, color.Bold)
 )
 
 func init() {
 	pflag.StringVar(&flags.color, "color", flags.color, `Colored output, either "always", "never", or "auto"`)
 	pflag.BoolVar(&flags.noNotify, "no-notify", false, "Disables notification via notify-send")
 	pflag.BoolVarP(&flags.showHelp, "help", "h", false, "Show this help text")
+	pflag.StringVarP(&flags.message, "message", "m", "", "Show a custom message when the time runs out")
 	pflag.Usage = func() {
 		fmt.Fprint(os.Stderr, `Usage: countdown <duration>
 
@@ -157,14 +161,28 @@ func printRemaining(dur time.Duration, start time.Time) {
 }
 
 func printDone(dur time.Duration) {
+	msg := strings.TrimSpace(flags.message)
+	if strings.ContainsRune(msg, '\n') {
+		msg = "\n\t" + strings.ReplaceAll(flags.message, "\n", "\n\t")
+	}
 	if color.NoColor {
 		fmt.Printf("countdown: Done waiting for %s\n", dur)
+		if flags.message != "" {
+			fmt.Printf("countdown: Message: %s\n", msg)
+		}
 	} else {
 		fmt.Printf("\r\x1B[0K%s %s %s\n",
 			colorCmdName.Sprint("countdown:"),
 			colorDone.Sprint("Done waiting for:"),
 			colorDuration.Sprint(dur.Round(time.Second)),
 		)
+		if flags.message != "" {
+			fmt.Printf("%s %s %s\n",
+				colorCmdName.Sprint("countdown:"),
+				colorMessagePrefix.Sprint("Message:"),
+				colorMessage.Sprint(msg),
+			)
+		}
 	}
 }
 
@@ -190,11 +208,16 @@ func sendNotification(dur time.Duration) {
 		return
 	}
 
+	msg := fmt.Sprintf("Done counting down from %s", dur)
+	if flags.message != "" {
+		msg = fmt.Sprintf("%s\n\n%s", strings.TrimSpace(flags.message), msg)
+	}
+
 	if err := exec.Command(exe,
 		"--urgency=critical",
 		"--app-name=countdown",
 		"Countdown expired!",
-		fmt.Sprintf("Done counting down from %s", dur),
+		msg,
 	).Run(); err != nil {
 		printErr(fmt.Errorf("run notify-send: %w", err))
 	}
