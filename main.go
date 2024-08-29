@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/jilleJr/countdown/internal/fuzzytime"
+	"github.com/applejag/countdown/internal/fuzzytime"
 	"github.com/mattn/go-colorable"
 	"github.com/spf13/pflag"
 )

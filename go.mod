@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: CC0-1.0
 
-module github.com/jilleJr/countdown
+module github.com/applejag/countdown
 
 go 1.18
 
